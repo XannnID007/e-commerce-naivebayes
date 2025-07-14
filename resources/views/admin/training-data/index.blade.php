@@ -10,10 +10,7 @@
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div class="flex-1">
                 <form method="GET" class="flex flex-col sm:flex-row gap-4">
-                    <div class="flex-1">
-                        <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari data training..."
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent">
-                    </div>
+
 
                     <div>
                         <select name="category"

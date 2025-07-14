@@ -15,12 +15,6 @@ use App\Http\Controllers\ModelEvaluationController;
 
 /*
 |--------------------------------------------------------------------------
-| Public Routes (Tidak perlu login)
-|--------------------------------------------------------------------------
-*/
-
-/*
-|--------------------------------------------------------------------------
 | Public Routes (User dapat akses tanpa login)
 |--------------------------------------------------------------------------
 */
@@ -34,7 +28,7 @@ Route::get('/kontak', [HomeController::class, 'contact'])->name('contact');
 Route::get('/produk', [ProductController::class, 'userIndex'])->name('products.index');
 Route::get('/produk/{product}', [ProductController::class, 'userShow'])->name('products.show');
 
-// Contact form submission (jika diperlukan)
+// Contact form submission
 Route::post('/kontak', [HomeController::class, 'submitContact'])->name('contact.submit');
 
 // Halaman kategori untuk user
@@ -65,12 +59,13 @@ Route::middleware(['auth'])->group(function () {
         ->name('admin.dashboard')
         ->middleware('admin');
 
-    /*
-    |--------------------------------------------------------------------------
-    | Manajemen Produk
-    |--------------------------------------------------------------------------
-    */
     Route::middleware('admin')->prefix('admin')->name('admin.')->group(function () {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Manajemen Produk
+        |--------------------------------------------------------------------------
+        */
 
         // CRUD Produk
         Route::resource('products', ProductController::class);
@@ -98,16 +93,24 @@ Route::middleware(['auth'])->group(function () {
 
         /*
         |--------------------------------------------------------------------------
-        | Manajemen Data Training
+        | Manajemen Data Training - Routes yang Diperbaiki
         |--------------------------------------------------------------------------
         */
 
         // CRUD Training Data
         Route::resource('training-data', TrainingDataController::class);
 
-        // Validasi data training
-        Route::post('training-data/{trainingData}/validate', [TrainingDataController::class, 'validate'])
+        // Validasi data training (diperbaiki nama method)
+        Route::post('training-data/{trainingData}/validate', [TrainingDataController::class, 'validateTrainingData'])
             ->name('training-data.validate');
+
+        // Batch validasi data training
+        Route::post('training-data/batch-validate', [TrainingDataController::class, 'batchValidate'])
+            ->name('training-data.batch-validate');
+
+        // Reset validasi data training
+        Route::post('training-data/{trainingData}/reset-validation', [TrainingDataController::class, 'resetValidation'])
+            ->name('training-data.reset-validation');
 
         // Training model Naive Bayes
         Route::post('training-data/train-model', [TrainingDataController::class, 'trainModel'])
@@ -116,6 +119,10 @@ Route::middleware(['auth'])->group(function () {
         // Import data training dari CSV
         Route::post('training-data/import', [TrainingDataController::class, 'import'])
             ->name('training-data.import');
+
+        // Preview import data
+        Route::post('training-data/preview-import', [TrainingDataController::class, 'previewImport'])
+            ->name('training-data.preview-import');
 
         // Export data training
         Route::get('training-data/export', [TrainingDataController::class, 'export'])
@@ -145,15 +152,19 @@ Route::middleware(['auth'])->group(function () {
 
         /*
         |--------------------------------------------------------------------------
-        | Manajemen User (jika diperlukan)
+        | Manajemen User
         |--------------------------------------------------------------------------
         */
 
         Route::resource('users', UserController::class);
 
+        // Toggle status user
+        Route::post('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])
+            ->name('users.toggle-status');
+
         /*
         |--------------------------------------------------------------------------
-        | API untuk Chart dan Ajax
+        | API untuk Chart, Ajax dan Real-time Data
         |--------------------------------------------------------------------------
         */
 
@@ -177,6 +188,10 @@ Route::middleware(['auth'])->group(function () {
         Route::post('api/preview-classification', [ProductController::class, 'previewClassification'])
             ->name('api.preview-classification');
 
+        // Statistics training data
+        Route::get('api/training-data-stats', [TrainingDataController::class, 'getStatistics'])
+            ->name('api.training-data-stats');
+
         /*
         |--------------------------------------------------------------------------
         | Settings & Configuration
@@ -190,7 +205,24 @@ Route::middleware(['auth'])->group(function () {
         Route::post('settings', [SettingsController::class, 'update'])
             ->name('settings.update');
 
-        // Backup & Restore
+        // Clear cache
+        Route::post('settings/clear-cache', [SettingsController::class, 'clearCache'])
+            ->name('settings.clear-cache');
+
+        // Optimize application
+        Route::post('settings/optimize-app', [SettingsController::class, 'optimizeApp'])
+            ->name('settings.optimize-app');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Backup & Restore
+        |--------------------------------------------------------------------------
+        */
+
+        // Backup management
+        Route::get('backup', [BackupController::class, 'index'])
+            ->name('backup.index');
+
         Route::post('backup/create', [BackupController::class, 'create'])
             ->name('backup.create');
 
@@ -205,17 +237,5 @@ Route::middleware(['auth'])->group(function () {
         | Laporan & Export
         |--------------------------------------------------------------------------
         */
-
-        // Laporan produk
-        Route::get('reports/products', [ReportController::class, 'products'])
-            ->name('reports.products');
-
-        // Laporan klasifikasi
-        Route::get('reports/classifications', [ReportController::class, 'classifications'])
-            ->name('reports.classifications');
-
-        // Export laporan ke PDF/Excel
-        Route::get('reports/export/{type}', [ReportController::class, 'export'])
-            ->name('reports.export');
     });
 });
