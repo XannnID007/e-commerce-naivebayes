@@ -5,10 +5,8 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\BackupController;
-use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\CategoryController;
-use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\TrainingDataController;
 use App\Http\Controllers\ModelEvaluationController;
@@ -61,12 +59,6 @@ Route::middleware(['auth'])->group(function () {
 
     Route::middleware('admin')->prefix('admin')->name('admin.')->group(function () {
 
-        /*
-        |--------------------------------------------------------------------------
-        | Manajemen Produk
-        |--------------------------------------------------------------------------
-        */
-
         // CRUD Produk
         Route::resource('products', ProductController::class);
 
@@ -78,11 +70,6 @@ Route::middleware(['auth'])->group(function () {
         Route::post('products/batch-classify', [ProductController::class, 'batchClassify'])
             ->name('products.batch-classify');
 
-        /*
-        |--------------------------------------------------------------------------
-        | Manajemen Kategori
-        |--------------------------------------------------------------------------
-        */
 
         // CRUD Kategori
         Route::resource('categories', CategoryController::class);
@@ -91,16 +78,11 @@ Route::middleware(['auth'])->group(function () {
         Route::post('categories/{category}/toggle-status', [CategoryController::class, 'toggleStatus'])
             ->name('categories.toggle-status');
 
-        /*
-        |--------------------------------------------------------------------------
-        | Manajemen Data Training - Routes yang Diperbaiki
-        |--------------------------------------------------------------------------
-        */
 
         // CRUD Training Data
         Route::resource('training-data', TrainingDataController::class);
 
-        // Validasi data training (diperbaiki nama method)
+        // Validasi data training
         Route::post('training-data/{trainingData}/validate', [TrainingDataController::class, 'validateTrainingData'])
             ->name('training-data.validate');
 
@@ -128,33 +110,27 @@ Route::middleware(['auth'])->group(function () {
         Route::get('training-data/export', [TrainingDataController::class, 'export'])
             ->name('training-data.export');
 
-        /*
-        |--------------------------------------------------------------------------
-        | Evaluasi Model
-        |--------------------------------------------------------------------------
-        */
+        // Get statistics untuk dashboard
+        Route::get('training-data/statistics', [TrainingDataController::class, 'getStatistics'])
+            ->name('training-data.statistics');
+
 
         // Halaman evaluasi model
         Route::get('model-evaluation', [ModelEvaluationController::class, 'index'])
             ->name('model-evaluation.index');
 
+        // Generate classification logs
+        Route::post('model-evaluation/generate-logs', [ModelEvaluationController::class, 'generateClassificationLogs'])
+            ->name('model-evaluation.generate-logs');
+
+        // Re-evaluate classification logs
+        Route::post('model-evaluation/reevaluate', [ModelEvaluationController::class, 'reevaluateAll'])
+            ->name('model-evaluation.reevaluate');
+
         // Export laporan evaluasi
         Route::get('model-evaluation/export', [ModelEvaluationController::class, 'exportReport'])
             ->name('model-evaluation.export');
 
-        // Test model dengan data testing
-        Route::post('model-evaluation/test', [ModelEvaluationController::class, 'testModel'])
-            ->name('model-evaluation.test');
-
-        // Reset evaluasi
-        Route::post('model-evaluation/reset', [ModelEvaluationController::class, 'resetEvaluation'])
-            ->name('model-evaluation.reset');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Manajemen User
-        |--------------------------------------------------------------------------
-        */
 
         Route::resource('users', UserController::class);
 
@@ -162,11 +138,6 @@ Route::middleware(['auth'])->group(function () {
         Route::post('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])
             ->name('users.toggle-status');
 
-        /*
-        |--------------------------------------------------------------------------
-        | API untuk Chart, Ajax dan Real-time Data
-        |--------------------------------------------------------------------------
-        */
 
         // Data untuk chart dashboard
         Route::get('api/dashboard-stats', [DashboardController::class, 'getStats'])
@@ -188,36 +159,6 @@ Route::middleware(['auth'])->group(function () {
         Route::post('api/preview-classification', [ProductController::class, 'previewClassification'])
             ->name('api.preview-classification');
 
-        // Statistics training data
-        Route::get('api/training-data-stats', [TrainingDataController::class, 'getStatistics'])
-            ->name('api.training-data-stats');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Settings & Configuration
-        |--------------------------------------------------------------------------
-        */
-
-        // Pengaturan sistem
-        Route::get('settings', [SettingsController::class, 'index'])
-            ->name('settings.index');
-
-        Route::post('settings', [SettingsController::class, 'update'])
-            ->name('settings.update');
-
-        // Clear cache
-        Route::post('settings/clear-cache', [SettingsController::class, 'clearCache'])
-            ->name('settings.clear-cache');
-
-        // Optimize application
-        Route::post('settings/optimize-app', [SettingsController::class, 'optimizeApp'])
-            ->name('settings.optimize-app');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Backup & Restore
-        |--------------------------------------------------------------------------
-        */
 
         // Backup management
         Route::get('backup', [BackupController::class, 'index'])
@@ -231,11 +172,5 @@ Route::middleware(['auth'])->group(function () {
 
         Route::post('backup/restore', [BackupController::class, 'restore'])
             ->name('backup.restore');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Laporan & Export
-        |--------------------------------------------------------------------------
-        */
     });
 });

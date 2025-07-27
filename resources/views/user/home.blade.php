@@ -37,7 +37,7 @@
                         <div class="space-y-4">
                             <div
                                 class="bg-white rounded-lg shadow-lg p-6 transform rotate-3 hover:rotate-0 transition-transform">
-                                <i class="fas fa-flower text-pink-500 text-2xl mb-2"></i>
+                                <i class="fas fa-spa text-pink-500 text-2xl mb-2"></i>
                                 <h3 class="font-semibold text-gray-900">Floral</h3>
                                 <p class="text-sm text-gray-600">Aroma bunga yang lembut</p>
                             </div>
@@ -63,51 +63,6 @@
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Features Section -->
-    <section class="py-16 bg-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-12">
-                <h2 class="text-3xl font-bold text-gray-900 mb-4">Mengapa Memilih Philocalist?</h2>
-                <p class="text-lg text-gray-600 max-w-3xl mx-auto">
-                    Kami menggunakan teknologi AI terdepan untuk membantu Anda menemukan parfum yang sempurna
-                </p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div class="text-center p-6">
-                    <div class="w-16 h-16 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-brain text-pink-600 text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-semibold text-gray-900 mb-2">Klasifikasi AI</h3>
-                    <p class="text-gray-600">
-                        Sistem klasifikasi otomatis menggunakan algoritma Naive Bayes untuk mengelompokkan parfum
-                        berdasarkan karakteristik aroma
-                    </p>
-                </div>
-
-                <div class="text-center p-6">
-                    <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-award text-blue-600 text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-semibold text-gray-900 mb-2">Kualitas Terjamin</h3>
-                    <p class="text-gray-600">
-                        Semua produk telah melalui quality control ketat dan menggunakan bahan-bahan berkualitas tinggi
-                    </p>
-                </div>
-
-                <div class="text-center p-6">
-                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-search text-green-600 text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-semibold text-gray-900 mb-2">Pencarian Mudah</h3>
-                    <p class="text-gray-600">
-                        Temukan parfum sesuai preferensi dengan sistem pencarian dan filter berdasarkan kategori aroma
-                    </p>
                 </div>
             </div>
         </div>

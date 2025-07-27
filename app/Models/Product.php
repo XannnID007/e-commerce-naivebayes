@@ -49,7 +49,8 @@ class Product extends Model
     public function getGambarUrlAttribute()
     {
         if ($this->gambar) {
-            return asset('storage/products/' . $this->gambar);
+            // Perbaikan: gunakan asset() dengan storage path yang benar
+            return asset('storage/' . $this->gambar);
         }
         return asset('images/default-perfume.jpg');
     }

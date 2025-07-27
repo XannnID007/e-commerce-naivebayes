@@ -56,9 +56,13 @@ class ProductController extends Controller
 
         $data = $request->all();
 
-        // Upload gambar jika ada
+        // Upload gambar jika ada - Perbaikan path storage
         if ($request->hasFile('gambar')) {
-            $data['gambar'] = $request->file('gambar')->store('products', 'public');
+            $file = $request->file('gambar');
+            $filename = time() . '_' . $file->getClientOriginalName();
+            // Simpan ke storage/app/public/products
+            $path = $file->storeAs('products', $filename, 'public');
+            $data['gambar'] = $path;
         }
 
         // Klasifikasi otomatis menggunakan Naive Bayes

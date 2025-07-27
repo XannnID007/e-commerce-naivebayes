@@ -102,15 +102,6 @@
                             Evaluasi Model
                         </a>
                     </div>
-
-                    <!-- Settings -->
-                    <div class="mt-6 pt-6 border-t border-gray-200">
-                        <a href="{{ route('admin.settings.index') }}"
-                            class="group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 text-gray-700 hover:bg-gray-100 hover:text-pink-600">
-                            <i class="fas fa-cog mr-3 text-gray-400 group-hover:text-pink-500"></i>
-                            Pengaturan
-                        </a>
-                    </div>
                 </div>
             </nav>
         </div>
@@ -132,23 +123,6 @@
 
                     <!-- Right Side Navigation -->
                     <div class="flex items-center space-x-4">
-                        <!-- Notifications -->
-                        <button class="p-2 text-gray-400 hover:text-gray-600 relative">
-                            <i class="fas fa-bell text-lg"></i>
-                            <span class="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full"></span>
-                        </button>
-
-                        <!-- Quick Actions -->
-                        <div class="hidden lg:flex items-center space-x-2">
-                            <a href="{{ route('admin.products.create') }}"
-                                class="px-3 py-1.5 text-xs font-medium text-white bg-pink-600 rounded-lg hover:bg-pink-700 transition-colors">
-                                <i class="fas fa-plus mr-1"></i>Produk
-                            </a>
-                            <a href="{{ route('admin.training-data.create') }}"
-                                class="px-3 py-1.5 text-xs font-medium text-pink-600 bg-pink-100 rounded-lg hover:bg-pink-200 transition-colors">
-                                <i class="fas fa-database mr-1"></i>Data
-                            </a>
-                        </div>
 
                         <!-- User Menu -->
                         <div class="relative" x-data="{ open: false }">
@@ -176,11 +150,6 @@
                                 <a href="{{ route('home') }}"
                                     class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                                     <i class="fas fa-home mr-3 text-gray-400"></i>Lihat Website
-                                </a>
-
-                                <a href="{{ route('admin.settings.index') }}"
-                                    class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                    <i class="fas fa-user-cog mr-3 text-gray-400"></i>Profil & Pengaturan
                                 </a>
 
                                 <div class="border-t border-gray-100 mt-1"></div>

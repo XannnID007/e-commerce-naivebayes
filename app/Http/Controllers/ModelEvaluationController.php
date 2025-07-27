@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\ClassificationLog;
 use App\Models\Category;
+use App\Models\Product;
 use App\Services\NaiveBayesService;
 
 class ModelEvaluationController extends Controller
@@ -24,29 +25,42 @@ class ModelEvaluationController extends Controller
         // Evaluasi per kategori
         $categoryStats = $this->getCategoryStats();
 
-        // Confusion Matrix
-        $confusionMatrix = $this->getConfusionMatrix();
-
         // Log klasifikasi terbaru
         $recentLogs = ClassificationLog::with(['product', 'predictedCategory', 'actualCategory'])
             ->latest()
             ->limit(20)
             ->get();
 
+        // Cek apakah perlu generate classification logs
+        $needsClassificationLogs = ClassificationLog::count() == 0 && Product::count() > 0;
+
         return view('admin.model-evaluation.index', compact(
             'overallStats',
             'categoryStats',
-            'confusionMatrix',
-            'recentLogs'
+            'recentLogs',
+            'needsClassificationLogs'
         ));
     }
 
     private function getOverallStats()
     {
         $totalClassifications = ClassificationLog::count();
-        $correctClassifications = ClassificationLog::where('is_correct', true)->count();
-        $accuracy = $totalClassifications > 0 ? ($correctClassifications / $totalClassifications) * 100 : 0;
 
+        if ($totalClassifications == 0) {
+            return [
+                'total_classifications' => 0,
+                'accuracy' => 0,
+                'avg_confidence' => 0,
+                'confidence_distribution' => [
+                    'high' => 0,
+                    'medium' => 0,
+                    'low' => 0
+                ]
+            ];
+        }
+
+        $correctClassifications = ClassificationLog::where('is_correct', true)->count();
+        $accuracy = ($correctClassifications / $totalClassifications) * 100;
         $avgConfidence = ClassificationLog::avg('confidence_score') ?? 0;
 
         $highConfidence = ClassificationLog::where('confidence_score', '>=', 80)->count();
@@ -95,23 +109,90 @@ class ModelEvaluationController extends Controller
         return $stats;
     }
 
-    private function getConfusionMatrix()
+    /**
+     * Generate classification logs untuk produk yang sudah ada
+     */
+    public function generateClassificationLogs()
     {
-        $categories = Category::all();
-        $matrix = [];
+        try {
+            $products = Product::whereNull('confidence_score')->get();
+            $generated = 0;
 
-        foreach ($categories as $actual) {
-            $row = ['category' => $actual->nama];
-            foreach ($categories as $predicted) {
-                $count = ClassificationLog::where('actual_category_id', $actual->id)
-                    ->where('predicted_category_id', $predicted->id)
-                    ->count();
-                $row[$predicted->nama] = $count;
+            foreach ($products as $product) {
+                $productData = [
+                    'deskripsi' => $product->deskripsi,
+                    'top_notes' => $product->top_notes,
+                    'middle_notes' => $product->middle_notes,
+                    'base_notes' => $product->base_notes
+                ];
+
+                $classification = $this->naiveBayesService->classify($productData);
+
+                // Update produk dengan hasil klasifikasi
+                $product->update([
+                    'confidence_score' => $classification['confidence_score']
+                ]);
+
+                // Buat classification log
+                ClassificationLog::create([
+                    'product_id' => $product->id,
+                    'predicted_category_id' => $classification['category_id'],
+                    'actual_category_id' => $product->category_id, // kategori asli produk
+                    'confidence_score' => $classification['confidence_score'],
+                    'probabilities' => $classification['probabilities'],
+                    'is_correct' => $classification['category_id'] == $product->category_id
+                ]);
+
+                $generated++;
             }
-            $matrix[] = $row;
-        }
 
-        return $matrix;
+            return redirect()->back()
+                ->with('success', "Berhasil generate {$generated} classification logs!");
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->with('error', 'Gagal generate classification logs: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Re-evaluate semua classification logs
+     */
+    public function reevaluateAll()
+    {
+        try {
+            $logs = ClassificationLog::with('product')->get();
+            $updated = 0;
+
+            foreach ($logs as $log) {
+                if ($log->product) {
+                    // Re-classify produk
+                    $productData = [
+                        'deskripsi' => $log->product->deskripsi,
+                        'top_notes' => $log->product->top_notes,
+                        'middle_notes' => $log->product->middle_notes,
+                        'base_notes' => $log->product->base_notes
+                    ];
+
+                    $classification = $this->naiveBayesService->classify($productData);
+
+                    // Update log
+                    $log->update([
+                        'predicted_category_id' => $classification['category_id'],
+                        'confidence_score' => $classification['confidence_score'],
+                        'probabilities' => $classification['probabilities'],
+                        'is_correct' => $classification['category_id'] == $log->product->category_id
+                    ]);
+
+                    $updated++;
+                }
+            }
+
+            return redirect()->back()
+                ->with('success', "Berhasil re-evaluate {$updated} classification logs!");
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->with('error', 'Gagal re-evaluate: ' . $e->getMessage());
+        }
     }
 
     public function exportReport()

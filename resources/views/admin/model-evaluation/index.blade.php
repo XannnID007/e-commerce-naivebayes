@@ -6,6 +6,34 @@
 
 @section('content')
     <div class="space-y-6">
+        @if (isset($needsClassificationLogs) && $needsClassificationLogs)
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-yellow-800">Belum Ada Data Evaluasi</h3>
+                        <div class="mt-2 text-sm text-yellow-700">
+                            <p>Sistem belum memiliki classification logs untuk dievaluasi. Silakan generate classification
+                                logs terlebih dahulu.</p>
+                        </div>
+                        <div class="mt-4">
+                            <div class="flex space-x-2">
+                                <form method="POST" action="{{ route('admin.model-evaluation.generate-logs') }}"
+                                    class="inline">
+                                    @csrf
+                                    <button type="submit"
+                                        class="bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-yellow-700">
+                                        <i class="fas fa-cogs mr-1"></i>Generate Classification Logs
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
         <!-- Stats Cards -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <!-- Total Klasifikasi -->
@@ -16,7 +44,8 @@
                     </div>
                     <div class="ml-4">
                         <p class="text-sm font-medium text-gray-600">Total Klasifikasi</p>
-                        <p class="text-2xl font-semibold text-gray-900">{{ $overallStats['total_classifications'] ?? 0 }}</p>
+                        <p class="text-2xl font-semibold text-gray-900">{{ $overallStats['total_classifications'] ?? 0 }}
+                        </p>
                     </div>
                 </div>
             </div>

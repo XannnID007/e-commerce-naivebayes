@@ -85,13 +85,11 @@ class TrainingDataController extends Controller
     }
 
     /**
-     * Validasi data training
-     * Method ini diperbaiki untuk menghindari konflik dengan Laravel's validate() method
+     * Validasi data training - Method diperbaiki
      */
     public function validateTrainingData(TrainingData $trainingData)
     {
         try {
-            // Update status validasi
             $trainingData->update(['is_validated' => true]);
 
             return redirect()->back()
@@ -108,7 +106,6 @@ class TrainingDataController extends Controller
     public function trainModel()
     {
         try {
-            // Cek apakah ada data training yang tervalidasi
             $validatedDataCount = TrainingData::where('is_validated', true)->count();
 
             if ($validatedDataCount < 5) {
@@ -116,7 +113,6 @@ class TrainingDataController extends Controller
                     ->with('error', 'Minimal 5 data training tervalidasi diperlukan untuk melatih model!');
             }
 
-            // Latih model
             $this->naiveBayesService->trainModel();
 
             return redirect()->back()
@@ -138,7 +134,8 @@ class TrainingDataController extends Controller
 
         try {
             $file = $request->file('file');
-            $data = array_map('str_getcsv', file($file->getRealPath()));
+            $path = $file->getRealPath();
+            $data = array_map('str_getcsv', file($path));
             $header = array_shift($data);
 
             $imported = 0;
@@ -147,7 +144,6 @@ class TrainingDataController extends Controller
             foreach ($data as $index => $row) {
                 if (count($row) >= 5) {
                     try {
-                        // Validasi category_id
                         $categoryId = (int) $row[4];
                         if (!Category::find($categoryId)) {
                             $errors[] = "Baris " . ($index + 2) . ": Kategori ID {$categoryId} tidak ditemukan";
@@ -160,7 +156,7 @@ class TrainingDataController extends Controller
                             'middle_notes' => !empty($row[2]) ? trim($row[2]) : null,
                             'base_notes' => !empty($row[3]) ? trim($row[3]) : null,
                             'category_id' => $categoryId,
-                            'is_validated' => false // Default belum tervalidasi
+                            'is_validated' => false
                         ]);
                         $imported++;
                     } catch (\Exception $e) {
@@ -210,8 +206,7 @@ class TrainingDataController extends Controller
 
             return response($csv)
                 ->header('Content-Type', 'text/csv; charset=UTF-8')
-                ->header('Content-Disposition', 'attachment; filename="' . $filename . '"')
-                ->header('Content-Transfer-Encoding', 'binary');
+                ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
         } catch (\Exception $e) {
             return redirect()->back()
                 ->with('error', 'Gagal mengexport data: ' . $e->getMessage());
@@ -253,108 +248,6 @@ class TrainingDataController extends Controller
         } catch (\Exception $e) {
             return redirect()->back()
                 ->with('error', 'Gagal mereset validasi: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Preview data sebelum import
-     */
-    public function previewImport(Request $request)
-    {
-        $request->validate([
-            'file' => 'required|mimes:csv,txt|max:2048'
-        ]);
-
-        try {
-            $file = $request->file('file');
-            $data = array_map('str_getcsv', file($file->getRealPath()));
-            $header = array_shift($data);
-
-            $preview = [];
-            $errors = [];
-
-            // Ambil 10 baris pertama untuk preview
-            $previewData = array_slice($data, 0, 10);
-
-            foreach ($previewData as $index => $row) {
-                $rowData = [
-                    'row_number' => $index + 2,
-                    'deskripsi' => $row[0] ?? '',
-                    'top_notes' => $row[1] ?? '',
-                    'middle_notes' => $row[2] ?? '',
-                    'base_notes' => $row[3] ?? '',
-                    'category_id' => $row[4] ?? '',
-                    'valid' => true,
-                    'errors' => []
-                ];
-
-                // Validasi data
-                if (empty($row[0])) {
-                    $rowData['valid'] = false;
-                    $rowData['errors'][] = 'Deskripsi tidak boleh kosong';
-                }
-
-                if (empty($row[4]) || !is_numeric($row[4])) {
-                    $rowData['valid'] = false;
-                    $rowData['errors'][] = 'Category ID harus berupa angka';
-                } else {
-                    $category = Category::find((int) $row[4]);
-                    if (!$category) {
-                        $rowData['valid'] = false;
-                        $rowData['errors'][] = 'Kategori tidak ditemukan';
-                    } else {
-                        $rowData['category_name'] = $category->nama;
-                    }
-                }
-
-                $preview[] = $rowData;
-            }
-
-            return response()->json([
-                'success' => true,
-                'preview' => $preview,
-                'total_rows' => count($data),
-                'header' => $header
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal membaca file: ' . $e->getMessage()
-            ], 400);
-        }
-    }
-
-    /**
-     * Get statistics untuk dashboard
-     */
-    public function getStatistics()
-    {
-        try {
-            $stats = [
-                'total' => TrainingData::count(),
-                'validated' => TrainingData::where('is_validated', true)->count(),
-                'unvalidated' => TrainingData::where('is_validated', false)->count(),
-                'by_category' => Category::withCount([
-                    'trainingData',
-                    'trainingData as validated_count' => function ($query) {
-                        $query->where('is_validated', true);
-                    }
-                ])->get(),
-                'recent_additions' => TrainingData::with('category')
-                    ->latest()
-                    ->limit(5)
-                    ->get()
-            ];
-
-            return response()->json([
-                'success' => true,
-                'data' => $stats
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
         }
     }
 }

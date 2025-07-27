@@ -111,7 +111,7 @@
                     @else
                         <!-- Login hanya untuk admin -->
                         <a href="{{ route('login') }}"
-                            class="text-pink-600 hover:text-pink-800 px-3 py-2 text-sm font-medium">
+                            class="btn btn-primarybtn-sm text-pink-600 hover:text-pink-800 px-3 py-2 text-sm font-medium">
                             Login
                         </a>
                     @endauth
