@@ -235,7 +235,7 @@ class ModelEvaluationController extends Controller
             DB::beginTransaction();
 
             // Hapus classification logs yang ada untuk fresh start
-            ClassificationLog::truncate();
+            ClassificationLog::query()->delete();
             Log::info('Cleared existing classification logs');
 
             foreach ($products as $product) {

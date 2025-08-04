@@ -299,6 +299,23 @@
                 @endif
             </div>
         </div>
+
+        <div class="mt-6 border-t border-gray-200 pt-6">
+    <dl class="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
+        <div class="sm:col-span-2">
+            <dt class="text-sm font-medium text-gray-500">
+                Tautan Shopee
+            </dt>
+            <dd class="mt-1 text-sm text-gray-900">
+                @if($product->shopee_link)
+                    <a href="{{ $product->shopee_link }}" target="_blank" class="text-blue-600 hover:underline break-all">
+                        {{ $product->shopee_link }} <i class="fas fa-external-link-alt ml-1 fa-xs"></i>
+                    </a>
+                @else
+                    <span class="text-gray-400 italic">Tidak ada tautan</span>
+                @endif
+            </dd>
+        </div>
     </div>
 
     <!-- Delete Confirmation Modal -->

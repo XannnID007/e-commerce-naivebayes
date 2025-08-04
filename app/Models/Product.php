@@ -22,7 +22,8 @@ class Product extends Model
         'stok',
         'category_id',
         'confidence_score',
-        'aktif'
+        'aktif',
+        'shopee_link',
     ];
 
     protected $casts = [

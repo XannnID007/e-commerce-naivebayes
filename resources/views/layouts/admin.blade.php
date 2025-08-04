@@ -80,6 +80,7 @@
                                 class="fas fa-tags mr-3 {{ request()->routeIs('admin.categories.*') ? 'text-pink-600' : 'text-gray-400 group-hover:text-pink-500' }}"></i>
                             Kategori Aroma
                         </a>
+
                     </div>
 
                     <!-- Machine Learning -->
@@ -100,6 +101,19 @@
                             <i
                                 class="fas fa-chart-line mr-3 {{ request()->routeIs('admin.model-evaluation.*') ? 'text-pink-600' : 'text-gray-400 group-hover:text-pink-500' }}"></i>
                             Evaluasi Model
+                        </a>
+                    </div>
+                    <!-- Manajemen User -->
+                    <div class="mt-6">
+                        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 py-2">
+                            Manajemen User
+                        </div>
+
+                        <a href="{{ route('admin.users.index') }}"
+                            class="group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 {{ request()->routeIs('admin.users.*') ? 'bg-pink-100 text-pink-700 border-r-2 border-pink-600' : 'text-gray-700 hover:bg-gray-100 hover:text-pink-600' }}">
+                            <i
+                                class="fas fa-users mr-3 {{ request()->routeIs('admin.users.*') ? 'text-pink-600' : 'text-gray-400 group-hover:text-pink-500' }}"></i>
+                            Kelola User
                         </a>
                     </div>
                 </div>

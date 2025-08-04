@@ -381,45 +381,46 @@ class NaiveBayesService
                     throw new \Exception('Tidak ada kategori yang tersedia');
                }
 
-               $categoryProbabilities = [];
+               $categoryLogProbabilities = [];
 
                foreach ($categories as $category) {
-                    $probability = $this->calculateCategoryProbability($category, $tokens);
-                    $categoryProbabilities[$category->id] = [
+                    $logProbability = $this->calculateCategoryProbability($category, $tokens);
+                    $categoryLogProbabilities[$category->id] = [
                          'category' => $category,
-                         'probability' => $probability,
-                         'log_probability' => $probability > 0 ? log($probability) : -INF
+                         'log_probability' => $logProbability
                     ];
                }
 
-               // Cari kategori dengan probabilitas tertinggi
-               $bestCategory = collect($categoryProbabilities)->sortByDesc('probability')->first();
+               // Cari kategori dengan log-probabilitas tertinggi (paling mendekati 0)
+               $bestCategory = collect($categoryLogProbabilities)->sortByDesc('log_probability')->first();
 
                if (!$bestCategory) {
                     throw new \Exception('Tidak dapat menentukan kategori terbaik');
                }
 
-               // Hitung confidence score
-               $totalProbability = collect($categoryProbabilities)->sum('probability');
-               $confidenceScore = 5; // minimum
+               // Hitung confidence score menggunakan Softmax
+               $logProbs = collect($categoryLogProbabilities)->pluck('log_probability');
+               $maxLogProb = $logProbs->max();
 
-               if ($totalProbability > 0) {
-                    $confidenceScore = ($bestCategory['probability'] / $totalProbability) * 100;
-                    $confidenceScore = min(100, max(5, $confidenceScore));
-               }
+               // Numerically stable softmax
+               $exps = $logProbs->map(fn($logProb) => exp($logProb - $maxLogProb));
+               $sumExps = $exps->sum();
+               $softmaxProbs = $exps->map(fn($exp) => $exp / $sumExps);
+
+               $confidenceScore = $softmaxProbs->max() * 100;
+               $confidenceScore = min(100, max(5, $confidenceScore)); // Batasi antara 5% dan 100%
 
                return [
                     'category_id' => $bestCategory['category']->id,
                     'category_name' => $bestCategory['category']->nama,
                     'confidence_score' => round($confidenceScore, 2),
-                    'probabilities' => $categoryProbabilities,
+                    'probabilities' => $categoryLogProbabilities, // Sekarang berisi log probabilities
                     'tokens_analyzed' => count($tokens),
                     'text_length' => strlen($text)
                ];
           } catch (\Exception $e) {
                Log::error('Error dalam klasifikasi: ' . $e->getMessage());
 
-               // Return kategori default jika error
                $defaultCategory = Category::first();
                if (!$defaultCategory) {
                     throw new \Exception('Tidak ada kategori yang tersedia dalam sistem');
@@ -446,34 +447,45 @@ class NaiveBayesService
                     ->count();
 
                $totalTrainingCount = TrainingData::where('is_validated', true)->count();
-               $priorProbability = $totalTrainingCount > 0 ? $categoryTrainingCount / $totalTrainingCount : 0.5;
+
+               // Handle case where totalTrainingCount is zero
+               if ($totalTrainingCount == 0) {
+                    return -INF; // Return negative infinity if no training data
+               }
+
+               $priorProbability = $categoryTrainingCount / $totalTrainingCount;
+
+               // Start with log of prior probability
+               $logProbability = log($priorProbability > 0 ? $priorProbability : 1E-10); // Avoid log(0)
 
                // Likelihood
                $categoryWords = NaiveBayesModel::where('category_id', $category->id)
                     ->pluck('probabilitas', 'kata')
                     ->toArray();
 
-               if (empty($categoryWords)) {
-                    return $priorProbability * 0.001;
-               }
+               $vocabularySize = count($categoryWords);
+               $totalWordsInCategory = NaiveBayesModel::where('category_id', $category->id)->sum('frekuensi');
 
-               $likelihood = 1.0;
-               $smoothingFactor = 0.001;
+               if ($vocabularySize === 0 || $totalWordsInCategory === 0) {
+                    return $logProbability; // Return only prior if no vocabulary
+               }
 
                foreach ($tokens as $token) {
-                    if (isset($categoryWords[$token])) {
-                         $likelihood *= $categoryWords[$token];
-                    } else {
-                         $likelihood *= $smoothingFactor;
-                    }
+                    $tokenProbability = $categoryWords[$token] ?? 0;
+
+                    // Apply Laplace smoothing for likelihood
+                    $smoothedProbability = ($tokenProbability * $totalWordsInCategory + 1) / ($totalWordsInCategory + $vocabularySize);
+
+                    $logProbability += log($smoothedProbability);
                }
 
-               return max(0.0001, $priorProbability * $likelihood);
+               return $logProbability;
           } catch (\Exception $e) {
                Log::error("Error calculating probability for category {$category->nama}: " . $e->getMessage());
-               return 0.0001;
+               return -INF; // Return a very small log probability on error
           }
      }
+
 
      private function buildTextFromProduct($productData)
      {

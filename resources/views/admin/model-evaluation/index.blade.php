@@ -54,7 +54,7 @@
             <div class="bg-white rounded-lg shadow p-6">
                 <div class="flex items-center">
                     <div class="p-3 rounded-full bg-green-100">
-                        <i class="fas fa-target text-green-600 text-xl"></i>
+                        <i class="fas fa-bullseye text-green-600 text-xl"></i>
                     </div>
                     <div class="ml-4">
                         <p class="text-sm font-medium text-gray-600">Akurasi Model</p>
@@ -93,29 +93,30 @@
 
         <!-- Evaluasi per Kategori -->
         <div class="bg-white shadow rounded-lg overflow-hidden">
-            <div class="flex gap-2">
-                <a href="{{ route('admin.model-evaluation.export') }}"
-                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
-                    <i class="fas fa-download mr-2"></i>Export CSV
-                </a>
+            <div class="px-6 py-4 border-b border-gray-200">
+                <div class="flex gap-2">
+                    <a href="{{ route('admin.model-evaluation.export') }}"
+                        class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
+                        <i class="fas fa-download mr-2"></i>Export CSV
+                    </a>
 
-                <!-- TOMBOL BARU INI -->
-                <form method="POST" action="{{ route('admin.model-evaluation.generate-logs') }}" class="inline">
-                    @csrf
-                    <button type="submit"
-                        onclick="return confirm('Generate ulang classification logs? Data lama akan dihapus.')"
-                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
-                        <i class="fas fa-sync mr-2"></i>Generate Logs
-                    </button>
-                </form>
+                    <form method="POST" action="{{ route('admin.model-evaluation.generate-logs') }}" class="inline">
+                        @csrf
+                        <button type="submit"
+                            onclick="return confirm('Generate ulang classification logs? Data lama akan dihapus.')"
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+                            <i class="fas fa-sync mr-2"></i>Generate Logs
+                        </button>
+                    </form>
 
-                <form method="POST" action="{{ route('admin.model-evaluation.reevaluate') }}" class="inline">
-                    @csrf
-                    <button type="submit" onclick="return confirm('Re-evaluate semua classification logs?')"
-                        class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">
-                        <i class="fas fa-redo mr-2"></i>Re-evaluate
-                    </button>
-                </form>
+                    <form method="POST" action="{{ route('admin.model-evaluation.reevaluate') }}" class="inline">
+                        @csrf
+                        <button type="submit" onclick="return confirm('Re-evaluate semua classification logs?')"
+                            class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">
+                            <i class="fas fa-redo mr-2"></i>Re-evaluate
+                        </button>
+                    </form>
+                </div>
             </div>
 
             <div class="overflow-x-auto">

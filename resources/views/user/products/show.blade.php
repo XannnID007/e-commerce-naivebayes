@@ -130,27 +130,27 @@
                         </div>
                     @endif
 
-                    <!-- CTA Buttons -->
-                    <div class="space-y-4">
-                        <div class="flex flex-col sm:flex-row gap-4">
-                            <button
-                                class="flex-1 bg-pink-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-pink-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                                {{ $product->stok <= 0 ? 'disabled' : '' }}>
-                                <i class="fas fa-shopping-cart mr-2"></i>
-                                {{ $product->stok > 0 ? 'Hubungi untuk Pembelian' : 'Stok Habis' }}
-                            </button>
+                    <div class="mt-8">
+                        <a href="{{ $product->shopee_link ?? '#' }}" target="_blank" rel="noopener noreferrer"
+                            class="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-orange-500 hover:bg-orange-600 transition-colors duration-300 ease-in-out shadow-lg transform hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500">
+                            <i class="fab fa-shopify mr-3"></i> {{-- Menggunakan ikon generik toko --}}
+                            Beli di Shopee
+                        </a>
+                    </div>
 
+                    <!-- CTA Buttons -->
+                    <div class="space-y-4 mt-8">
+                        <div class="flex flex-col sm:flex-row gap-4">
+                            <a href="https://wa.me/{{ config('services.whatsapp.number') }}?text={{ urlencode('Halo, saya tertarik dengan produk: ' . $product->nama) }}"
+                                target="_blank" rel="noopener noreferrer"
+                                class="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-500 hover:bg-green-600 transition-colors duration-300 ease-in-out shadow-lg transform hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                                <i class="fab fa-whatsapp mr-3"></i>
+                                Hubungi via WA
+                            </a>
                             <button onclick="shareProduct()"
                                 class="px-6 py-3 border border-pink-600 text-pink-600 rounded-lg font-medium hover:bg-pink-50 transition-colors">
                                 <i class="fas fa-share mr-2"></i>Bagikan
                             </button>
-                        </div>
-
-                        <div class="text-center">
-                            <a href="{{ route('contact') }}" class="text-pink-600 hover:text-pink-800 text-sm font-medium">
-                                <i class="fas fa-phone mr-1"></i>
-                                Butuh bantuan? Hubungi customer service
-                            </a>
                         </div>
                     </div>
                 </div>

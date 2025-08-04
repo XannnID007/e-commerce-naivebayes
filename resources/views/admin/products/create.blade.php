@@ -104,6 +104,26 @@
                             <p class="mt-1 text-sm text-gray-500">Format: JPEG, PNG, JPG, GIF. Maksimal 2MB</p>
                         </div>
 
+
+                        <div class="mb-6">
+                            <label for="shopee_link" class="block mb-2 text-sm font-medium text-gray-900">
+                                Tautan Shopee
+                            </label>
+                            <div class="flex">
+                                <span
+                                    class="inline-flex items-center px-3 text-sm text-gray-900 bg-gray-200 border border-r-0 border-gray-300 rounded-l-md">
+                                    <i class="fas fa-link"></i>
+                                </span>
+                                <input type="url" id="shopee_link" name="shopee_link"
+                                    class="rounded-none rounded-r-lg bg-gray-50 border border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500 block flex-1 min-w-0 w-full text-sm p-2.5"
+                                    placeholder="https://shopee.co.id/nama-produk"
+                                    value="{{ old('shopee_link', $product->shopee_link ?? '') }}">
+                            </div>
+                            @error('shopee_link')
+                                <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
                         <!-- Fragrance Notes -->
                         <div class="space-y-4">
                             <h3 class="text-lg font-medium text-gray-900">Fragrance Notes</h3>
