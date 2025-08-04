@@ -29,7 +29,7 @@ class ModelEvaluationController extends Controller
             $categoryStats = $this->getCategoryStats();
 
             // Log klasifikasi terbaru dengan limit dan eager loading
-            $recentLogs = ClassificationLog::with(['product', 'predictedCategory', 'actualCategory'])
+            $recentClassifications = ClassificationLog::with(['product', 'predictedCategory', 'actualCategory'])
                 ->latest()
                 ->limit(20)
                 ->get();
@@ -43,7 +43,7 @@ class ModelEvaluationController extends Controller
             return view('admin.model-evaluation.index', compact(
                 'overallStats',
                 'categoryStats',
-                'recentLogs',
+                'recentClassifications',
                 'needsClassificationLogs',
                 'insights'
             ));
@@ -74,14 +74,14 @@ class ModelEvaluationController extends Controller
                 ];
             }
 
-            // Use more efficient queries
+            // PERBAIKAN: Query yang lebih akurat
             $stats = ClassificationLog::selectRaw('
                 COUNT(*) as total,
-                AVG(confidence_score) as avg_confidence,
+                AVG(CAST(confidence_score AS DECIMAL(5,2))) as avg_confidence,
                 SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
-                SUM(CASE WHEN confidence_score >= 80 THEN 1 ELSE 0 END) as high_confidence,
-                SUM(CASE WHEN confidence_score >= 60 AND confidence_score < 80 THEN 1 ELSE 0 END) as medium_confidence,
-                SUM(CASE WHEN confidence_score < 60 THEN 1 ELSE 0 END) as low_confidence
+                SUM(CASE WHEN CAST(confidence_score AS DECIMAL(5,2)) >= 80 THEN 1 ELSE 0 END) as high_confidence,
+                SUM(CASE WHEN CAST(confidence_score AS DECIMAL(5,2)) >= 60 AND CAST(confidence_score AS DECIMAL(5,2)) < 80 THEN 1 ELSE 0 END) as medium_confidence,
+                SUM(CASE WHEN CAST(confidence_score AS DECIMAL(5,2)) < 60 THEN 1 ELSE 0 END) as low_confidence
             ')->first();
 
             $accuracy = $stats->total > 0 ? ($stats->correct_count / $stats->total) * 100 : 0;
@@ -92,11 +92,11 @@ class ModelEvaluationController extends Controller
                 'accuracy' => round($accuracy, 2),
                 'avg_confidence' => round($stats->avg_confidence ?? 0, 2),
                 'confidence_distribution' => [
-                    'high' => $stats->high_confidence,
-                    'medium' => $stats->medium_confidence,
-                    'low' => $stats->low_confidence
+                    'high' => $stats->high_confidence ?? 0,
+                    'medium' => $stats->medium_confidence ?? 0,
+                    'low' => $stats->low_confidence ?? 0
                 ],
-                'correct_predictions' => $stats->correct_count,
+                'correct_predictions' => $stats->correct_count ?? 0,
                 'error_rate' => round($errorRate, 2)
             ];
         } catch (\Exception $e) {
@@ -119,12 +119,14 @@ class ModelEvaluationController extends Controller
             $stats = [];
 
             foreach ($categories as $category) {
+                // PERBAIKAN: Perhitungan precision dan recall yang lebih akurat
+
                 // Precision: dari semua prediksi untuk kategori ini, berapa yang benar
                 $totalPredicted = ClassificationLog::where('predicted_category_id', $category->id)->count();
                 $correctPredicted = ClassificationLog::where('predicted_category_id', $category->id)
                     ->where('is_correct', true)->count();
 
-                // Recall: dari semua data aktual kategori ini, berapa yang berhasil diprediksi
+                // Recall: dari semua data aktual kategori ini, berapa yang berhasil diprediksi benar
                 $totalActual = ClassificationLog::where('actual_category_id', $category->id)->count();
                 $correctRecalled = ClassificationLog::where('actual_category_id', $category->id)
                     ->where('is_correct', true)->count();
@@ -138,9 +140,10 @@ class ModelEvaluationController extends Controller
                 // Support - jumlah sampel aktual untuk kategori ini
                 $support = $totalActual;
 
-                // Average confidence untuk kategori ini
-                $avgConfidence = ClassificationLog::where('predicted_category_id', $category->id)
-                    ->avg('confidence_score') ?? 0;
+                // Average confidence untuk prediksi kategori ini
+                $avgConfidenceQuery = ClassificationLog::where('predicted_category_id', $category->id);
+                $avgConfidence = $avgConfidenceQuery->count() > 0 ?
+                    $avgConfidenceQuery->avg(DB::raw('CAST(confidence_score AS DECIMAL(5,2))')) : 0;
 
                 $stats[] = [
                     'category' => $category,
@@ -150,7 +153,7 @@ class ModelEvaluationController extends Controller
                     'support' => $support,
                     'total_predicted' => $totalPredicted,
                     'correct_predicted' => $correctPredicted,
-                    'avg_confidence' => round($avgConfidence, 2)
+                    'avg_confidence' => round($avgConfidence ?? 0, 2)
                 ];
             }
 
@@ -174,10 +177,10 @@ class ModelEvaluationController extends Controller
             $bestCategories = array_slice($categoryStats, 0, 3);
             $worstCategories = array_slice(array_reverse($categoryStats), 0, 3);
 
-            // Confidence trends
+            // Confidence trends (last 30 days)
             $confidenceTrends = ClassificationLog::selectRaw('
                 DATE(created_at) as date,
-                AVG(confidence_score) as avg_confidence,
+                AVG(CAST(confidence_score AS DECIMAL(5,2))) as avg_confidence,
                 COUNT(*) as total_predictions
             ')
                 ->where('created_at', '>=', now()->subDays(30))
@@ -215,62 +218,105 @@ class ModelEvaluationController extends Controller
     public function generateClassificationLogs()
     {
         try {
-            DB::beginTransaction();
-
-            $products = Product::whereNull('confidence_score')->get();
-            $generated = 0;
-            $errors = [];
+            // Validasi awal tanpa transaction
+            $products = Product::with('category')->get();
 
             if ($products->isEmpty()) {
                 return redirect()->back()
-                    ->with('info', 'Semua produk sudah memiliki classification logs.');
+                    ->with('info', 'Tidak ada produk yang ditemukan untuk diklasifikasi.');
             }
+
+            Log::info('Starting classification logs generation for ' . $products->count() . ' products');
+
+            $generated = 0;
+            $errors = [];
+
+            // Start transaction setelah validasi
+            DB::beginTransaction();
+
+            // Hapus classification logs yang ada untuk fresh start
+            ClassificationLog::truncate();
+            Log::info('Cleared existing classification logs');
 
             foreach ($products as $product) {
                 try {
+                    // Pastikan produk punya deskripsi minimal
+                    if (empty($product->deskripsi)) {
+                        $errors[] = "Produk ID {$product->id} ({$product->nama}): Tidak ada deskripsi";
+                        continue;
+                    }
+
                     $productData = [
-                        'deskripsi' => $product->deskripsi,
-                        'top_notes' => $product->top_notes,
-                        'middle_notes' => $product->middle_notes,
-                        'base_notes' => $product->base_notes
+                        'deskripsi' => (string) ($product->deskripsi ?? ''),
+                        'top_notes' => (string) ($product->top_notes ?? ''),
+                        'middle_notes' => (string) ($product->middle_notes ?? ''),
+                        'base_notes' => (string) ($product->base_notes ?? '')
                     ];
 
+                    // Klasifikasi dengan AI
                     $classification = $this->naiveBayesService->classify($productData);
 
-                    // Update produk dengan hasil klasifikasi
-                    $product->update([
+                    if (!$classification || !isset($classification['category_id'])) {
+                        $errors[] = "Produk ID {$product->id}: Gagal klasifikasi AI";
+                        continue;
+                    }
+
+                    // Update produk dengan hasil klasifikasi (tanpa transaction)
+                    Product::where('id', $product->id)->update([
                         'confidence_score' => $classification['confidence_score']
                     ]);
 
-                    // Buat classification log dengan actual category
+                    // Buat classification log
                     ClassificationLog::create([
                         'product_id' => $product->id,
                         'predicted_category_id' => $classification['category_id'],
                         'actual_category_id' => $product->category_id,
                         'confidence_score' => $classification['confidence_score'],
-                        'probabilities' => $classification['probabilities'],
+                        'probabilities' => is_array($classification['probabilities']) ?
+                            json_encode($classification['probabilities']) : ($classification['probabilities'] ?? '{}'),
                         'is_correct' => $classification['category_id'] == $product->category_id
                     ]);
 
                     $generated++;
+
+                    Log::info("Generated classification log for product {$product->id}: " .
+                        "Predicted={$classification['category_id']}, " .
+                        "Actual={$product->category_id}, " .
+                        "Confidence={$classification['confidence_score']}%, " .
+                        "Correct=" . ($classification['category_id'] == $product->category_id ? 'Yes' : 'No'));
                 } catch (\Exception $e) {
-                    $errors[] = "Produk ID {$product->id}: " . $e->getMessage();
+                    $errors[] = "Produk ID {$product->id} ({$product->nama}): " . $e->getMessage();
                     Log::error("Error classifying product {$product->id}: " . $e->getMessage());
+                    continue; // Continue dengan produk lain
                 }
+            }
+
+            if ($generated == 0) {
+                DB::rollback();
+                return redirect()->back()
+                    ->with('error', 'Tidak ada classification logs yang berhasil di-generate. Pastikan model sudah dilatih dan produk memiliki deskripsi.');
             }
 
             DB::commit();
 
-            $message = "Berhasil generate {$generated} classification logs!";
+            $message = "Berhasil generate {$generated} classification logs dari {$products->count()} produk!";
             if (!empty($errors)) {
                 $message .= " Dengan " . count($errors) . " error.";
-                session()->flash('generation_errors', array_slice($errors, 0, 5));
+                session()->flash('generation_errors', array_slice($errors, 0, 10));
             }
+
+            Log::info("Successfully generated {$generated} classification logs");
 
             return redirect()->back()->with('success', $message);
         } catch (\Exception $e) {
-            DB::rollback();
+            // Rollback hanya jika transaction masih aktif
+            if (DB::transactionLevel() > 0) {
+                DB::rollback();
+            }
+
             Log::error('Error generating classification logs: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+
             return redirect()->back()
                 ->with('error', 'Gagal generate classification logs: ' . $e->getMessage());
         }
@@ -290,10 +336,10 @@ class ModelEvaluationController extends Controller
                     try {
                         // Re-classify produk
                         $productData = [
-                            'deskripsi' => $log->product->deskripsi,
-                            'top_notes' => $log->product->top_notes,
-                            'middle_notes' => $log->product->middle_notes,
-                            'base_notes' => $log->product->base_notes
+                            'deskripsi' => $log->product->deskripsi ?? '',
+                            'top_notes' => $log->product->top_notes ?? '',
+                            'middle_notes' => $log->product->middle_notes ?? '',
+                            'base_notes' => $log->product->base_notes ?? ''
                         ];
 
                         $classification = $this->naiveBayesService->classify($productData);
@@ -302,7 +348,7 @@ class ModelEvaluationController extends Controller
                         $log->update([
                             'predicted_category_id' => $classification['category_id'],
                             'confidence_score' => $classification['confidence_score'],
-                            'probabilities' => $classification['probabilities'],
+                            'probabilities' => json_encode($classification['probabilities']),
                             'is_correct' => $classification['category_id'] == $log->product->category_id
                         ]);
 
@@ -396,7 +442,7 @@ class ModelEvaluationController extends Controller
             $trends = ClassificationLog::selectRaw('
                 DATE(created_at) as date,
                 AVG(CASE WHEN is_correct = 1 THEN 100 ELSE 0 END) as accuracy,
-                AVG(confidence_score) as avg_confidence,
+                AVG(CAST(confidence_score AS DECIMAL(5,2))) as avg_confidence,
                 COUNT(*) as total_predictions
             ')
                 ->where('created_at', '>=', now()->subDays(30))

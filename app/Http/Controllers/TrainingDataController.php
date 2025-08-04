@@ -150,6 +150,7 @@ class TrainingDataController extends Controller
     public function trainModel()
     {
         try {
+            // Validasi awal tanpa transaction
             $validatedCount = TrainingData::where('is_validated', true)->count();
             $categoriesWithData = TrainingData::where('is_validated', true)
                 ->distinct('category_id')
@@ -187,19 +188,36 @@ class TrainingDataController extends Controller
                     ->with('error', 'Setiap kategori harus memiliki minimal 2 data training. Kategori dengan data kurang: ' . $problematicCategories);
             }
 
-            // Training model
+            Log::info('Memulai training model dengan ' . $validatedCount . ' data tervalidasi');
+
+            // Training model - biarkan NaiveBayesService handle transaction-nya sendiri
             $result = $this->naiveBayesService->trainModel();
+
+            // Clear cache setelah berhasil training
+            if (function_exists('opcache_reset')) {
+                opcache_reset();
+            }
 
             return redirect()->back()->with(
                 'success',
-                "Model Naive Bayes berhasil dilatih! Data tervalidasi: {$validatedCount}, Kategori: {$categoriesWithData}/{$totalCategories}"
+                "Model Naive Bayes berhasil dilatih! Data tervalidasi: {$validatedCount}, Kategori: {$categoriesWithData}/{$totalCategories}. Akurasi model telah diperbarui."
             );
         } catch (\Exception $e) {
-            Log::error('Error training model: ' . $e->getMessage());
+            Log::error('Error training model in controller: ' . $e->getMessage());
             Log::error('Stack trace: ' . $e->getTraceAsString());
 
-            return redirect()->back()
-                ->with('error', 'Gagal melatih model: ' . $e->getMessage());
+            // Buat pesan error yang lebih user-friendly
+            $errorMessage = 'Gagal melatih model: ';
+
+            if (str_contains($e->getMessage(), 'no active transaction')) {
+                $errorMessage .= 'Masalah koneksi database. Silakan coba lagi.';
+            } elseif (str_contains($e->getMessage(), 'Minimal')) {
+                $errorMessage .= $e->getMessage();
+            } else {
+                $errorMessage .= 'Terjadi kesalahan sistem. Pastikan data training sudah lengkap dan coba lagi.';
+            }
+
+            return redirect()->back()->with('error', $errorMessage);
         }
     }
 
@@ -229,6 +247,7 @@ class TrainingDataController extends Controller
             $errors = [];
             $rowNumber = 2; // Start from row 2 (after header)
 
+            // Mulai transaction untuk import
             DB::beginTransaction();
 
             while (($row = fgetcsv($handle, 1000, ',')) !== FALSE) {
@@ -284,7 +303,11 @@ class TrainingDataController extends Controller
             return redirect()->back()->with('success', $message);
         } catch (\Exception $e) {
             if (isset($handle)) fclose($handle);
-            DB::rollback();
+
+            // Rollback hanya jika transaction masih aktif
+            if (DB::transactionLevel() > 0) {
+                DB::rollback();
+            }
 
             Log::error('Error importing training data: ' . $e->getMessage());
             return redirect()->back()
@@ -363,6 +386,57 @@ class TrainingDataController extends Controller
             Log::error('Error resetting training data validation: ' . $e->getMessage());
             return redirect()->back()
                 ->with('error', 'Gagal mereset validasi: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get training data statistics for API calls
+     */
+    public function getStatistics()
+    {
+        try {
+            $stats = [
+                'total' => TrainingData::count(),
+                'validated' => TrainingData::where('is_validated', true)->count(),
+                'pending' => TrainingData::where('is_validated', false)->count(),
+                'by_category' => TrainingData::select('category_id')
+                    ->selectRaw('count(*) as total, sum(case when is_validated = 1 then 1 else 0 end) as validated')
+                    ->groupBy('category_id')
+                    ->with('category:id,nama')
+                    ->get()
+            ];
+
+            return response()->json([
+                'success' => true,
+                'data' => $stats
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error getting training data statistics: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get model status and last training info
+     */
+    public function getModelStatus()
+    {
+        try {
+            $modelStats = $this->naiveBayesService->getModelStats();
+
+            return response()->json([
+                'success' => true,
+                'data' => $modelStats
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error getting model status: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
 }
