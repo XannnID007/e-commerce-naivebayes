@@ -18,7 +18,7 @@ class UserSeeder extends Seeder
         ]);
 
         User::create([
-            'name' => 'User Demo',
+            'name' => 'User',
             'email' => 'user@philocalist.com',
             'password' => Hash::make('password123'),
             'role' => 'user'

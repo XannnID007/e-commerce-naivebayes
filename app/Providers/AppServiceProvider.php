@@ -18,8 +18,9 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot()
     {
-        // Gunakan Bootstrap untuk pagination
-        Paginator::useBootstrapFive();
+        // Gunakan custom pagination view
+        Paginator::defaultView('custom.pagination');
+        Paginator::defaultSimpleView('custom.simple-pagination');
 
         // Set default timezone
         date_default_timezone_set('Asia/Jakarta');

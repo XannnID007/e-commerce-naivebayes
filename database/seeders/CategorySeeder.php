@@ -12,43 +12,33 @@ class CategorySeeder extends Seeder
         $categories = [
             [
                 'nama' => 'Floral',
-                'deskripsi' => 'Aroma bunga yang lembut dan feminin',
-                'icon' => 'fas fa-flower'
+                'deskripsi' => 'Aroma bunga yang lembut dan feminin dengan sentuhan romantis',
+                'icon' => 'fas fa-spa',
+                'aktif' => true
             ],
             [
                 'nama' => 'Woody',
-                'deskripsi' => 'Aroma kayu yang hangat dan maskulin',
-                'icon' => 'fas fa-tree'
+                'deskripsi' => 'Aroma kayu yang hangat dan maskulin dengan karakter yang kuat',
+                'icon' => 'fas fa-tree',
+                'aktif' => true
             ],
             [
                 'nama' => 'Oriental',
-                'deskripsi' => 'Aroma eksotis dengan rempah-rempah',
-                'icon' => 'fas fa-star'
+                'deskripsi' => 'Aroma eksotis dengan rempah-rempah dan nuansa misterius',
+                'icon' => 'fas fa-star',
+                'aktif' => true
             ],
             [
                 'nama' => 'Fresh',
-                'deskripsi' => 'Aroma segar dan bersih',
-                'icon' => 'fas fa-leaf'
+                'deskripsi' => 'Aroma segar dan bersih yang memberikan kesegaran alami',
+                'icon' => 'fas fa-leaf',
+                'aktif' => true
             ],
             [
-                'nama' => 'Citrus',
-                'deskripsi' => 'Aroma jeruk yang menyegarkan',
-                'icon' => 'fas fa-lemon'
-            ],
-            [
-                'nama' => 'Fougère',
-                'deskripsi' => 'Aroma herbal dengan lavender',
-                'icon' => 'fas fa-seedling'
-            ],
-            [
-                'nama' => 'Chypre',
-                'deskripsi' => 'Aroma kompleks dengan oakmoss',
-                'icon' => 'fas fa-mountain'
-            ],
-            [
-                'nama' => 'Gourmand',
-                'deskripsi' => 'Aroma manis seperti makanan',
-                'icon' => 'fas fa-cookie'
+                'nama' => 'Fruity',
+                'deskripsi' => 'Aroma buah-buahan yang manis dan menyegarkan',
+                'icon' => 'fas fa-apple-alt',
+                'aktif' => true
             ]
         ];
 
