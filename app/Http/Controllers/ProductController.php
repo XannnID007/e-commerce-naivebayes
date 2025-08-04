@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Product;
 use App\Models\Category;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use App\Services\NaiveBayesService;
 use Illuminate\Support\Facades\Storage;
 
@@ -125,15 +126,30 @@ class ProductController extends Controller
 
     public function destroy(Product $product)
     {
-        // Hapus gambar jika ada
-        if ($product->gambar) {
-            Storage::disk('public')->delete($product->gambar);
+        try {
+            DB::beginTransaction();
+
+            // Hapus classification logs yang terkait dengan produk ini
+            $product->classificationLogs()->delete();
+
+            // Hapus gambar jika ada
+            if ($product->gambar) {
+                Storage::disk('public')->delete($product->gambar);
+            }
+
+            // Hapus produk
+            $product->delete();
+
+            DB::commit();
+
+            return redirect()->route('admin.products.index')
+                ->with('success', 'Produk berhasil dihapus beserta data klasifikasinya!');
+        } catch (\Exception $e) {
+            DB::rollback();
+
+            return redirect()->back()
+                ->with('error', 'Gagal menghapus produk: ' . $e->getMessage());
         }
-
-        $product->delete();
-
-        return redirect()->route('admin.products.index')
-            ->with('success', 'Produk berhasil dihapus!');
     }
 
     public function reclassify(Product $product)

@@ -82,31 +82,22 @@ Route::middleware(['auth'])->group(function () {
         // CRUD Training Data
         Route::resource('training-data', TrainingDataController::class);
 
-        // Validasi data training
+        // Methods tambahan untuk training data
         Route::post('training-data/{trainingData}/validate', [TrainingDataController::class, 'validateTrainingData'])
             ->name('training-data.validate');
 
-        // Batch validasi data training
         Route::post('training-data/batch-validate', [TrainingDataController::class, 'batchValidate'])
             ->name('training-data.batch-validate');
 
-        // Reset validasi data training
         Route::post('training-data/{trainingData}/reset-validation', [TrainingDataController::class, 'resetValidation'])
             ->name('training-data.reset-validation');
 
-        // Training model Naive Bayes
         Route::post('training-data/train-model', [TrainingDataController::class, 'trainModel'])
             ->name('training-data.train-model');
 
-        // Import data training dari CSV
         Route::post('training-data/import', [TrainingDataController::class, 'import'])
             ->name('training-data.import');
 
-        // Preview import data
-        Route::post('training-data/preview-import', [TrainingDataController::class, 'previewImport'])
-            ->name('training-data.preview-import');
-
-        // Export data training
         Route::get('training-data/export', [TrainingDataController::class, 'export'])
             ->name('training-data.export');
 
@@ -158,19 +149,5 @@ Route::middleware(['auth'])->group(function () {
         // Preview klasifikasi sebelum menyimpan
         Route::post('api/preview-classification', [ProductController::class, 'previewClassification'])
             ->name('api.preview-classification');
-
-
-        // Backup management
-        Route::get('backup', [BackupController::class, 'index'])
-            ->name('backup.index');
-
-        Route::post('backup/create', [BackupController::class, 'create'])
-            ->name('backup.create');
-
-        Route::get('backup/download/{file}', [BackupController::class, 'download'])
-            ->name('backup.download');
-
-        Route::post('backup/restore', [BackupController::class, 'restore'])
-            ->name('backup.restore');
     });
 });

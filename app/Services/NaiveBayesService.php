@@ -9,6 +9,7 @@ use App\Models\ClassificationLog;
 use App\Models\Product;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class NaiveBayesService
 {
@@ -44,8 +45,50 @@ class NaiveBayesService
           'to',
           'for',
           'of',
-          'with'
+          'with',
+          'this',
+          'that',
+          'these',
+          'those',
+          'it',
+          'its',
+          'is',
+          'are',
+          'was',
+          'were',
+          'be',
+          'have',
+          'has',
+          'had',
+          'do',
+          'does',
+          'did',
+          'will',
+          'would',
+          'could',
+          'should',
+          'may',
+          'might',
+          'must',
+          'can',
+          'all',
+          'any',
+          'some',
+          'no',
+          'not',
+          'only',
+          'own',
+          'same',
+          'so',
+          'than',
+          'too',
+          'very',
+          'just',
+          'now'
      ];
+
+     private $minWordLength = 3;
+     private $maxWordLength = 50;
 
      public function trainModel()
      {
@@ -53,6 +96,9 @@ class NaiveBayesService
                Log::info('Memulai training model Naive Bayes...');
 
                DB::beginTransaction();
+
+               // Validasi data training
+               $this->validateTrainingData();
 
                // Hapus model lama
                Log::info('Menghapus model lama...');
@@ -68,7 +114,7 @@ class NaiveBayesService
                Log::info('Total data training: ' . $allTrainingData->count());
                Log::info('Total kategori: ' . $categories->count());
 
-               // Cek apakah ada data untuk setiap kategori
+               // Cek distribusi data per kategori
                $dataPerCategory = $allTrainingData->groupBy('category_id');
                Log::info('Data per kategori: ' . $dataPerCategory->map->count()->toArray());
 
@@ -85,13 +131,59 @@ class NaiveBayesService
                     $this->trainCategoryModel($category, $categoryData);
                }
 
+               // Clear cache untuk model
+               Cache::forget('naive_bayes_model_stats');
+               Cache::forget('naive_bayes_categories');
+
                DB::commit();
                Log::info('Training model berhasil diselesaikan');
+
+               return [
+                    'success' => true,
+                    'total_categories' => $categories->count(),
+                    'total_training_data' => $allTrainingData->count(),
+                    'categories_trained' => $dataPerCategory->count()
+               ];
           } catch (\Exception $e) {
                DB::rollback();
                Log::error('Error training Naive Bayes model: ' . $e->getMessage());
                Log::error('Stack trace: ' . $e->getTraceAsString());
                throw $e;
+          }
+     }
+
+     private function validateTrainingData()
+     {
+          $validatedCount = TrainingData::where('is_validated', true)->count();
+          if ($validatedCount < 10) {
+               throw new \Exception("Minimal 10 data training tervalidasi diperlukan (saat ini: {$validatedCount})");
+          }
+
+          $categoriesWithData = TrainingData::where('is_validated', true)
+               ->distinct('category_id')
+               ->count('category_id');
+
+          if ($categoriesWithData < 2) {
+               throw new \Exception("Minimal 2 kategori harus memiliki data training tervalidasi");
+          }
+
+          // Cek minimal data per kategori
+          $categoryStats = TrainingData::where('is_validated', true)
+               ->select('category_id')
+               ->selectRaw('count(*) as count')
+               ->groupBy('category_id')
+               ->with('category:id,nama')
+               ->get();
+
+          $problemCategories = [];
+          foreach ($categoryStats as $stat) {
+               if ($stat->count < 2) {
+                    $problemCategories[] = $stat->category->nama;
+               }
+          }
+
+          if (!empty($problemCategories)) {
+               throw new \Exception('Setiap kategori harus memiliki minimal 2 data training. Kategori bermasalah: ' . implode(', ', $problemCategories));
           }
      }
 
@@ -120,21 +212,41 @@ class NaiveBayesService
 
                Log::info("Kategori {$category->nama}: {$totalWords} total kata, {$vocabularySize} unique kata");
 
+               // Filter kata berdasarkan frekuensi minimum
+               $minFrequency = max(1, intval($totalWords * 0.001)); // Minimal 0.1% dari total kata
+               $filteredWords = array_filter($wordFrequencies, function ($freq) use ($minFrequency) {
+                    return $freq >= $minFrequency;
+               });
+
                // Simpan ke database dengan Laplace smoothing
-               foreach ($wordFrequencies as $word => $frequency) {
-                    if (strlen($word) > 2) { // Hanya simpan kata yang panjangnya > 2 karakter
+               $batchData = [];
+               foreach ($filteredWords as $word => $frequency) {
+                    if (strlen($word) >= $this->minWordLength && strlen($word) <= $this->maxWordLength) {
                          $probability = ($frequency + 1) / ($totalWords + $vocabularySize);
 
-                         NaiveBayesModel::create([
+                         $batchData[] = [
                               'category_id' => $category->id,
                               'kata' => $word,
                               'frekuensi' => $frequency,
-                              'probabilitas' => $probability
-                         ]);
+                              'probabilitas' => $probability,
+                              'created_at' => now(),
+                              'updated_at' => now()
+                         ];
+
+                         // Insert in batches untuk performance
+                         if (count($batchData) >= 100) {
+                              NaiveBayesModel::insert($batchData);
+                              $batchData = [];
+                         }
                     }
                }
 
-               Log::info("Selesai training kategori: {$category->nama}");
+               // Insert remaining data
+               if (!empty($batchData)) {
+                    NaiveBayesModel::insert($batchData);
+               }
+
+               Log::info("Selesai training kategori: {$category->nama} dengan " . count($filteredWords) . " kata");
           } catch (\Exception $e) {
                Log::error("Error training kategori {$category->nama}: " . $e->getMessage());
                throw $e;
@@ -153,14 +265,19 @@ class NaiveBayesService
                }
 
                $categories = Category::all();
+               if ($categories->isEmpty()) {
+                    throw new \Exception('Tidak ada kategori yang tersedia');
+               }
+
                $categoryProbabilities = [];
+               $totalCategories = $categories->count();
 
                foreach ($categories as $category) {
                     $probability = $this->calculateCategoryProbability($category, $tokens);
                     $categoryProbabilities[$category->id] = [
                          'category' => $category,
                          'probability' => $probability,
-                         'log_probability' => log($probability)
+                         'log_probability' => $probability > 0 ? log($probability) : -INF
                     ];
                }
 
@@ -171,60 +288,100 @@ class NaiveBayesService
                     throw new \Exception('Tidak dapat menentukan kategori terbaik');
                }
 
-               // Hitung confidence score (konversi ke persentase)
+               // Hitung confidence score dengan normalisasi
                $totalProbability = collect($categoryProbabilities)->sum('probability');
-               $confidenceScore = $totalProbability > 0 ? ($bestCategory['probability'] / $totalProbability) * 100 : 0;
+               $confidenceScore = 0;
+
+               if ($totalProbability > 0) {
+                    $confidenceScore = ($bestCategory['probability'] / $totalProbability) * 100;
+
+                    // Adjust confidence based on token count (more tokens = more confident)
+                    $tokenBonus = min(10, count($tokens) * 0.5); // Max 10% bonus
+                    $confidenceScore = min(100, $confidenceScore + $tokenBonus);
+               }
+
+               // Apply minimum confidence threshold
+               $confidenceScore = max(5, $confidenceScore); // Minimum 5% confidence
 
                return [
                     'category_id' => $bestCategory['category']->id,
                     'category_name' => $bestCategory['category']->nama,
                     'confidence_score' => round($confidenceScore, 2),
-                    'probabilities' => $categoryProbabilities
+                    'probabilities' => $categoryProbabilities,
+                    'tokens_analyzed' => count($tokens),
+                    'text_length' => strlen($text)
                ];
           } catch (\Exception $e) {
                Log::error('Error dalam klasifikasi: ' . $e->getMessage());
 
                // Return kategori default jika error
                $defaultCategory = Category::first();
+               if (!$defaultCategory) {
+                    throw new \Exception('Tidak ada kategori yang tersedia dalam sistem');
+               }
+
                return [
                     'category_id' => $defaultCategory->id,
                     'category_name' => $defaultCategory->nama,
-                    'confidence_score' => 0,
-                    'probabilities' => []
+                    'confidence_score' => 5.00, // Very low confidence for errors
+                    'probabilities' => [],
+                    'tokens_analyzed' => 0,
+                    'text_length' => 0,
+                    'error' => $e->getMessage()
                ];
           }
      }
 
      private function calculateCategoryProbability($category, $tokens)
      {
-          // Prior probability (uniform untuk semua kategori)
-          $priorProbability = 1 / Category::count();
+          try {
+               // Prior probability (berdasarkan jumlah data training)
+               $categoryTrainingCount = TrainingData::where('category_id', $category->id)
+                    ->where('is_validated', true)
+                    ->count();
 
-          // Likelihood
-          $likelihood = 1.0;
+               $totalTrainingCount = TrainingData::where('is_validated', true)->count();
+               $priorProbability = $totalTrainingCount > 0 ? $categoryTrainingCount / $totalTrainingCount : 1 / Category::count();
 
-          foreach ($tokens as $token) {
-               $wordModel = NaiveBayesModel::where('category_id', $category->id)
-                    ->where('kata', $token)
-                    ->first();
+               // Likelihood dengan caching
+               $cacheKey = "nb_category_{$category->id}_words";
+               $categoryWords = Cache::remember($cacheKey, 3600, function () use ($category) {
+                    return NaiveBayesModel::where('category_id', $category->id)
+                         ->pluck('probabilitas', 'kata')
+                         ->toArray();
+               });
 
-               if ($wordModel) {
-                    $likelihood *= $wordModel->probabilitas;
-               } else {
-                    // Smoothing untuk kata yang tidak ditemukan
-                    $totalWords = NaiveBayesModel::where('category_id', $category->id)->sum('frekuensi');
-                    $vocabularySize = NaiveBayesModel::where('category_id', $category->id)->count();
+               if (empty($categoryWords)) {
+                    Log::warning("Tidak ada model kata untuk kategori: {$category->nama}");
+                    return $priorProbability * 0.001; // Very small probability
+               }
 
-                    if ($totalWords > 0 && $vocabularySize > 0) {
-                         $smoothedProbability = 1 / ($totalWords + $vocabularySize);
-                         $likelihood *= $smoothedProbability;
+               $likelihood = 1.0;
+               $smoothingFactor = 0.001; // Laplace smoothing
+               $processedTokens = 0;
+
+               foreach ($tokens as $token) {
+                    if (isset($categoryWords[$token])) {
+                         $likelihood *= $categoryWords[$token];
+                         $processedTokens++;
                     } else {
-                         $likelihood *= 0.001; // Nilai default kecil
+                         // Smoothing untuk kata yang tidak ditemukan
+                         $likelihood *= $smoothingFactor;
                     }
                }
-          }
 
-          return $priorProbability * $likelihood;
+               // Adjust likelihood berdasarkan jumlah token yang diproses
+               if ($processedTokens > 0) {
+                    $coverageBonus = min(2.0, 1 + ($processedTokens / count($tokens))); // Max 2x bonus
+                    $likelihood *= $coverageBonus;
+               }
+
+               return max(0.0001, $priorProbability * $likelihood); // Minimum probability
+
+          } catch (\Exception $e) {
+               Log::error("Error calculating probability for category {$category->nama}: " . $e->getMessage());
+               return 0.0001; // Very small probability for errors
+          }
      }
 
      private function buildTextFromProduct($productData)
@@ -244,40 +401,106 @@ class NaiveBayesService
           // Konversi ke lowercase
           $text = strtolower($text);
 
-          // Hapus karakter khusus, hanya simpan huruf dan spasi
-          $text = preg_replace('/[^a-z\s]/', ' ', $text);
-
-          // Hapus extra spaces
+          // Remove extra whitespace dan newlines
           $text = preg_replace('/\s+/', ' ', $text);
 
-          return trim($text);
+          // Hapus karakter khusus, tapi pertahankan huruf dan angka
+          $text = preg_replace('/[^a-z0-9\s]/', ' ', $text);
+
+          // Hapus angka standalone (tapi biarkan dalam kata)
+          $text = preg_replace('/\b\d+\b/', ' ', $text);
+
+          // Trim dan hapus extra spaces
+          $text = trim(preg_replace('/\s+/', ' ', $text));
+
+          return $text;
      }
 
      private function tokenize($text)
      {
           $words = explode(' ', $text);
 
-          // Filter stop words dan kata kosong
+          // Filter kata-kata
           $words = array_filter($words, function ($word) {
                return !empty($word) &&
-                    strlen($word) > 2 &&
-                    !in_array($word, $this->stopWords);
+                    strlen($word) >= $this->minWordLength &&
+                    strlen($word) <= $this->maxWordLength &&
+                    !in_array($word, $this->stopWords) &&
+                    !is_numeric($word);
           });
 
-          return array_values($words);
+          // Remove duplicates dan return
+          return array_values(array_unique($words));
      }
 
      public function logClassification($product, $classification)
      {
           try {
-               ClassificationLog::create([
+               // Cek apakah sudah ada log untuk produk ini
+               $existingLog = ClassificationLog::where('product_id', $product->id)->first();
+
+               $logData = [
                     'product_id' => $product->id,
                     'predicted_category_id' => $classification['category_id'],
+                    'actual_category_id' => $product->category_id,
                     'confidence_score' => $classification['confidence_score'],
-                    'probabilities' => $classification['probabilities']
-               ]);
+                    'probabilities' => $classification['probabilities'],
+                    'is_correct' => $classification['category_id'] == $product->category_id,
+                    'tokens_analyzed' => $classification['tokens_analyzed'] ?? 0,
+                    'text_length' => $classification['text_length'] ?? 0
+               ];
+
+               if ($existingLog) {
+                    $existingLog->update($logData);
+                    Log::info("Updated classification log for product {$product->id}");
+               } else {
+                    ClassificationLog::create($logData);
+                    Log::info("Created new classification log for product {$product->id}");
+               }
           } catch (\Exception $e) {
                Log::error('Error logging classification: ' . $e->getMessage());
+               // Don't throw exception here to avoid breaking the main classification flow
+          }
+     }
+
+     /**
+      * Get model statistics
+      */
+     public function getModelStats()
+     {
+          return Cache::remember('naive_bayes_model_stats', 3600, function () {
+               $totalWords = NaiveBayesModel::count();
+               $totalCategories = NaiveBayesModel::distinct('category_id')->count();
+               $avgWordsPerCategory = $totalCategories > 0 ? $totalWords / $totalCategories : 0;
+
+               $categoryStats = NaiveBayesModel::select('category_id')
+                    ->selectRaw('COUNT(*) as word_count, AVG(probabilitas) as avg_probability')
+                    ->groupBy('category_id')
+                    ->with('category:id,nama')
+                    ->get();
+
+               return [
+                    'total_words' => $totalWords,
+                    'total_categories' => $totalCategories,
+                    'avg_words_per_category' => round($avgWordsPerCategory, 2),
+                    'category_stats' => $categoryStats,
+                    'last_trained' => NaiveBayesModel::max('updated_at')
+               ];
+          });
+     }
+
+     /**
+      * Clear model cache
+      */
+     public function clearCache()
+     {
+          Cache::forget('naive_bayes_model_stats');
+          Cache::forget('naive_bayes_categories');
+
+          // Clear all category-specific caches
+          $categories = Category::all();
+          foreach ($categories as $category) {
+               Cache::forget("nb_category_{$category->id}_words");
           }
      }
 }
